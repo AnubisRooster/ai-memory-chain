@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-gray-800 bg-gray-900 p-5 shadow-lg;
+  }
+
+  .badge-online {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-emerald-900/40 px-2.5 py-0.5 text-xs font-medium text-emerald-400 ring-1 ring-emerald-500/30;
+  }
+
+  .badge-offline {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-red-900/40 px-2.5 py-0.5 text-xs font-medium text-red-400 ring-1 ring-red-500/30;
+  }
+}

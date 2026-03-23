@@ -1,0 +1,49 @@
+{
+  "name": "ai-memory-chain",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Full-stack AI memory storage on Polygon Edge + IPFS",
+  "scripts": {
+    "install:all": "pnpm install",
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.ts --network localhost",
+    "genesis": "ts-node scripts/genesis.ts",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+    "dev": "concurrently \"pnpm dev:backend\" \"pnpm dev:frontend\"",
+    "test": "pnpm --filter backend test && pnpm --filter agent-sdk test && hardhat test",
+    "test:unit": "pnpm --filter backend test && pnpm --filter agent-sdk test",
+    "test:contract": "hardhat test",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write '**/*.{ts,tsx,json,sol,md}'"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "concurrently": "^8.2.0",
+    "eslint": "^8.57.0",
+    "hardhat": "^2.22.0",
+    "prettier": "^3.2.0",
+    "prettier-plugin-solidity": "^1.3.0",
+    "ts-node": "^10.9.0",
+    "typechain": "^8.3.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "ethers": "^6.11.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "keccak",
+      "secp256k1",
+      "better-sqlite3"
+    ]
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=8"
+  }
+}

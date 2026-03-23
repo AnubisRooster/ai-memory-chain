@@ -1,0 +1,16 @@
+packages:
+  - "backend"
+  - "frontend"
+  - "agent-sdk"
+allowBuilds:
+  '1': true
+  '2': true
+  '5': true
+  '6': true
+  ',': true
+  a: true
+  c: true
+  e: true
+  k: true
+  p: true
+  s: true

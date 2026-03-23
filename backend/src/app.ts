@@ -1,0 +1,54 @@
+import express, { Express } from 'express';
+import cors from 'cors';
+import morgan from 'morgan';
+import os from 'os';
+import memoryRouter from './routes/memory';
+import searchRouter from './routes/search';
+import auditRouter from './routes/audit';
+import ipfsProxyRouter from './routes/ipfs-proxy';
+
+export function createApp(): Express {
+  const app = express();
+
+  app.use(cors());
+  if (process.env.NODE_ENV !== 'test') {
+    app.use(morgan('dev'));
+  }
+  app.use(express.json({ limit: '10mb' }));
+
+  app.use('/memory', memoryRouter);
+  app.use('/search', searchRouter);
+  app.use('/security', auditRouter);
+  app.use('/ipfs', ipfsProxyRouter);
+
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok', service: 'ai-memory-backend' });
+  });
+
+  app.get('/connect', (_req, res) => {
+    const addresses = getLanAddresses();
+    const PORT = parseInt(process.env.PORT || '3001', 10);
+    res.json({
+      frontend: addresses.map((ip) => `http://${ip}:3000`),
+      backend: addresses.map((ip) => `http://${ip}:${PORT}`),
+      hostname: os.hostname(),
+      addresses,
+    });
+  });
+
+  return app;
+}
+
+export function getLanAddresses(): string[] {
+  const interfaces = os.networkInterfaces();
+  const addrs: string[] = [];
+  for (const nets of Object.values(interfaces)) {
+    if (!nets) continue;
+    for (const net of nets) {
+      if (net.family === 'IPv4' && !net.internal) {
+        addrs.push(net.address);
+      }
+    }
+  }
+  return addrs;
+}
