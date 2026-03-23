@@ -226,17 +226,20 @@ node ~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-store.mjs \
 A sync script keeps OpenClaw's native memory files and the blockchain in sync:
 
 ```bash
-# Back up OpenClaw memory files to blockchain
+# Back up changed OpenClaw memory files to blockchain (hash-based dedup)
 node ~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-bridge.mjs sync-to-chain
 
-# Import blockchain memories as markdown (into memory/chain-imports/)
+# Import new blockchain memories since last sync (incremental — fast)
 node ~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-bridge.mjs sync-from-chain
 
-# Check sync status
+# Full rescan of entire blockchain (use after data recovery or if imports were missed)
+node ~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-bridge.mjs sync-from-chain --full
+
+# Check sync status, high-water mark, and pending count
 node ~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-bridge.mjs status
 ```
 
-The bridge runs automatically via an OpenClaw cron job every 30 minutes. It tracks file hashes in `bridge-state.json` to avoid duplicate writes. Files tagged `openclaw-sync` are skipped during import to prevent circular syncs.
+The bridge runs automatically via an OpenClaw cron job every 30 minutes using **incremental sync**. It tracks a high-water mark (the highest chain memory ID processed) in `bridge-state.json` and only fetches memories above that threshold. The first run performs a full scan to establish the baseline. Use `--full` to force a complete rescan when needed. Files tagged `openclaw-sync` are skipped during import to prevent circular syncs.
 
 ---
 

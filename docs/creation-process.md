@@ -227,11 +227,11 @@ The project was scaffolded in this order:
 
 7. **Bidirectional memory bridge** (`scripts/memory-bridge.mjs`):
    - `sync-to-chain` — scans OpenClaw memory files (`MEMORY.md`, `memory/**/*.md`), computes SHA-256 of each, compares against `bridge-state.json`, stores changed files as blockchain memories with `openclaw-sync` tag and source file metadata.
-   - `sync-from-chain` — fetches all blockchain memories, skips those already imported or tagged `openclaw-sync` (prevents circular sync), converts new memories to markdown in `~/.openclaw/workspace/memory/chain-imports/` for automatic indexing by OpenClaw's memory search.
-   - `status` — displays last sync timestamps, pending changes, memory counts on both sides, backend health.
-   - State tracking via `bridge-state.json` with file hashes and known chain memory IDs.
+   - `sync-from-chain` — uses **incremental sync by default**: tracks a high-water mark (the highest chain memory ID processed) and only fetches memories above it. The first run or `--full` flag triggers a complete scan. Skips memories tagged `openclaw-sync` to prevent circular sync. Converts new memories to markdown in `~/.openclaw/workspace/memory/chain-imports/` for automatic indexing by OpenClaw's memory search.
+   - `status` — displays last sync timestamps, high-water mark, pending import count, memory counts on both sides, backend health.
+   - State tracking via `bridge-state.json` with file hashes, known chain memory IDs, and `highWaterMark`.
 
-8. **OpenClaw cron job** — Added `memory-chain-bridge-sync` to `~/.openclaw/cron/jobs.json` (30-minute interval, `*/30 * * * *`). Disabled the old `daily-memory-backup` job that was failing with execution timeouts — the bridge is a more reliable, stateful replacement.
+8. **OpenClaw cron job** — Added `memory-chain-bridge-sync` to `~/.openclaw/cron/jobs.json` (30-minute interval, `*/30 * * * *`). Uses incremental sync (no `--full` flag) so each run only checks for new memories since the last high-water mark. Disabled the old `daily-memory-backup` job that was failing with execution timeouts — the bridge is a more reliable, stateful replacement.
 
 9. **Test expansion** (15 new tests, 99 total):
    - `audit-log.test.ts` (12 tests): clean scan logging, blocked scan with threats, summary truncation, unfiltered query, filter by safe=true/false, filter by threat type, pagination, accurate stats, empty stats, limit cap.
@@ -759,18 +759,22 @@ The bridge keeps OpenClaw's native markdown memory files and the blockchain in s
 5. Updates `bridge-state.json` with new hashes.
 
 **Sync from chain** (`sync-from-chain`):
-1. Fetches the full memory list from the backend.
-2. Skips memories already in `bridge-state.json`'s known ID set.
-3. Skips memories tagged `openclaw-sync` (prevents circular sync from to-chain → from-chain).
-4. Converts each new memory to a markdown file in `~/.openclaw/workspace/memory/chain-imports/` with front matter (summary, author, timestamps, CID, hash, tags, content data).
-5. These files are automatically indexed by OpenClaw's memory search.
+Uses **incremental sync by default** — only processes memories above the high-water mark.
+1. Gets the current memory count from the backend.
+2. Reads `highWaterMark` from `bridge-state.json` (the highest ID processed in the last sync).
+3. If incremental (default): only fetches memories from `highWaterMark + 1` to `count - 1`. If `--full`: scans from ID 0.
+4. Skips memories tagged `openclaw-sync` (prevents circular sync from to-chain → from-chain).
+5. Converts each new memory to a markdown file in `~/.openclaw/workspace/memory/chain-imports/`.
+6. Updates `highWaterMark` to the last processed ID.
+7. First run always does a full scan (highWaterMark starts at -1).
 
 **State tracking** — `bridge-state.json` stores:
 - `lastSyncToChain` / `lastSyncFromChain` timestamps
 - `fileHashes` (relPath → SHA-256) for change detection
 - `chainMemoryIds` (array of known IDs) for import deduplication
+- `highWaterMark` (integer) — the highest chain memory ID that has been processed; incremental sync starts from `highWaterMark + 1`
 
-**Cron job** — `memory-chain-bridge-sync` in `~/.openclaw/cron/jobs.json`, runs `*/30 * * * *` (every 30 minutes). The old `daily-memory-backup` job was disabled as the bridge is a more reliable, stateful replacement for workspace backup.
+**Cron job** — `memory-chain-bridge-sync` in `~/.openclaw/cron/jobs.json`, runs `*/30 * * * *` (every 30 minutes). Uses incremental sync (no `--full` flag) so each 30-minute run only checks for memories created since the last sync — not the entire chain. The old `daily-memory-backup` job was disabled as the bridge is a more reliable, stateful replacement for workspace backup.
 
 ---
 
@@ -1068,8 +1072,8 @@ All files in the project, organized by purpose:
 | `~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-search.mjs` | CLI: search memories |
 | `~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-list.mjs` | CLI: list all memories |
 | `~/.openclaw/workspace/skills/ai-memory-chain/scripts/security-audit.mjs` | CLI: security audit log and stats |
-| `~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-bridge.mjs` | Bidirectional memory bridge (sync-to-chain, sync-from-chain, status) |
-| `~/.openclaw/workspace/skills/ai-memory-chain/bridge-state.json` | Bridge state — file hashes, sync timestamps, known chain IDs |
+| `~/.openclaw/workspace/skills/ai-memory-chain/scripts/memory-bridge.mjs` | Bidirectional memory bridge (sync-to-chain, sync-from-chain [--full], status) |
+| `~/.openclaw/workspace/skills/ai-memory-chain/bridge-state.json` | Bridge state — file hashes, sync timestamps, known chain IDs, highWaterMark |
 | `~/.openclaw/workspace/TOOLS.md` | Updated with 6 new chain memory tool definitions |
 | `~/.openclaw/cron/jobs.json` | Added memory-chain-bridge-sync cron (30min interval) |
 
