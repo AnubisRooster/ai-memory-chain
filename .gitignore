@@ -6,5 +6,8 @@ artifacts/
 cache/
 coverage/
 .env
+.env.local
 *.log
+*.pid
 data/
+logs/

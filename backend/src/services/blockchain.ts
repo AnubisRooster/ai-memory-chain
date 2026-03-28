@@ -10,6 +10,9 @@ const ABI = [
   'event MemoryStored(uint256 indexed id, address indexed author, string ipfsCID, bytes32 sha256Hash, uint256 timestamp)',
 ];
 
+const RPC_TIMEOUT_MS = 15_000;
+const TX_CONFIRM_TIMEOUT_MS = 60_000;
+
 let provider: ethers.JsonRpcProvider;
 let contract: ethers.Contract;
 let signer: ethers.Wallet;
@@ -32,7 +35,9 @@ function getContractAddress(): string {
 export function getProvider(): ethers.JsonRpcProvider {
   if (!provider) {
     const rpcUrl = process.env.RPC_URL || 'http://127.0.0.1:8545';
-    provider = new ethers.JsonRpcProvider(rpcUrl);
+    const fetchReq = new ethers.FetchRequest(rpcUrl);
+    fetchReq.timeout = RPC_TIMEOUT_MS;
+    provider = new ethers.JsonRpcProvider(fetchReq);
   }
   return provider;
 }
@@ -66,7 +71,15 @@ export async function storeMemoryOnChain(
   const int16Embedding = embedding.map((v) => Math.round(Math.max(-32768, Math.min(32767, v))));
 
   const tx = await c.storeMemory(summary, ipfsCID, sha256Hash, int16Embedding);
-  const receipt = await tx.wait();
+
+  const receipt = await Promise.race([
+    tx.wait(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Transaction confirmation timed out after ${TX_CONFIRM_TIMEOUT_MS}ms`)), TX_CONFIRM_TIMEOUT_MS)
+    ),
+  ]);
+
+  if (!receipt) throw new Error('Transaction receipt is null — possible reorg');
 
   const event = receipt.logs
     .map((log: ethers.Log) => {

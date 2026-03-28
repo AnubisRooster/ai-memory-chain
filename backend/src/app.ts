@@ -36,19 +36,34 @@ export function createApp(): Express {
     });
   });
 
+  app.use((_req, res) => {
+    res.status(404).json({ error: 'Not found' });
+  });
+
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error('Unhandled error:', err.message);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   return app;
 }
 
 export function getLanAddresses(): string[] {
-  const interfaces = os.networkInterfaces();
-  const addrs: string[] = [];
-  for (const nets of Object.values(interfaces)) {
-    if (!nets) continue;
-    for (const net of nets) {
-      if (net.family === 'IPv4' && !net.internal) {
-        addrs.push(net.address);
+  try {
+    const interfaces = os.networkInterfaces();
+    const addrs: string[] = [];
+    for (const nets of Object.values(interfaces)) {
+      if (!nets) continue;
+      for (const net of nets) {
+        if (net.family === 'IPv4' && !net.internal) {
+          addrs.push(net.address);
+        }
       }
     }
+    return addrs;
+  } catch {
+    return [];
   }
-  return addrs;
 }

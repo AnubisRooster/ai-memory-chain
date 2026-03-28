@@ -14,6 +14,9 @@
     "test": "pnpm --filter backend test && pnpm --filter agent-sdk test && hardhat test",
     "test:unit": "pnpm --filter backend test && pnpm --filter agent-sdk test",
     "test:contract": "hardhat test",
+    "build": "pnpm --filter backend build && pnpm --filter frontend build",
+    "start": "bash scripts/startup.sh",
+    "stop": "bash scripts/shutdown.sh",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write '**/*.{ts,tsx,json,sol,md}'"
   },
