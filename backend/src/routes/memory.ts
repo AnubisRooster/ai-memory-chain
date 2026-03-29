@@ -186,7 +186,13 @@ router.get('/:id', async (req: Request, res: Response) => {
     let ipfsContent = null;
 
     try {
-      ipfsContent = await fetchJSON(onChain.ipfsCID);
+      const IPFS_DETAIL_TIMEOUT_MS = 10_000;
+      ipfsContent = await Promise.race([
+        fetchJSON(onChain.ipfsCID),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('IPFS fetch timed out')), IPFS_DETAIL_TIMEOUT_MS),
+        ),
+      ]);
     } catch (err) {
       console.warn(`Could not fetch IPFS content for CID ${onChain.ipfsCID}:`, err);
     }

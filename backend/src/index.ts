@@ -1,10 +1,12 @@
 import { createApp, getLanAddresses } from './app';
 import { closeDB } from './services/audit-log';
+import { startHealthMonitor, stopHealthMonitor } from './services/health-monitor';
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 const app = createApp();
+startHealthMonitor();
 
 const server = app.listen(PORT, HOST, () => {
   const addrs = getLanAddresses();
@@ -23,6 +25,7 @@ function shutdown(signal: string) {
 
   server.close(() => {
     console.log('HTTP server closed.');
+    stopHealthMonitor();
     try {
       closeDB();
       console.log('Database closed.');

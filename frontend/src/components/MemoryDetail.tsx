@@ -150,7 +150,8 @@ export default function MemoryDetail({ memoryId }: MemoryDetailProps) {
 
   const ipfs = memory.ipfsContent;
   const ipfsGateway = '/api/ipfs';
-  const hasContent = ipfs?.data && typeof ipfs.data === 'object' && 'content' in ipfs.data;
+  const ipfsData = ipfs?.data && typeof ipfs.data === 'object' ? ipfs.data : null;
+  const hasContent = ipfsData !== null && 'content' in ipfsData;
 
   return (
     <div className="space-y-4">
@@ -209,7 +210,7 @@ export default function MemoryDetail({ memoryId }: MemoryDetailProps) {
       </div>
 
       {/* Text content */}
-      {hasContent && (
+      {hasContent && ipfsData && (
         <div className="card">
           <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
             Content
@@ -219,7 +220,7 @@ export default function MemoryDetail({ memoryId }: MemoryDetailProps) {
               ipfs?.type === 'code' ? 'font-mono' : ''
             }`}
           >
-            {String(ipfs!.data.content)}
+            {String(ipfsData.content)}
           </pre>
         </div>
       )}
@@ -230,7 +231,7 @@ export default function MemoryDetail({ memoryId }: MemoryDetailProps) {
       )}
 
       {/* IPFS JSON data (excluding content which is shown above) */}
-      {ipfs && (
+      {ipfs && ipfsData && (
         <div className="card">
           <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
             IPFS Data
@@ -238,7 +239,7 @@ export default function MemoryDetail({ memoryId }: MemoryDetailProps) {
           <pre className="max-h-64 overflow-auto rounded-lg bg-gray-800/50 p-4 text-xs text-gray-300">
             {JSON.stringify(
               Object.fromEntries(
-                Object.entries(ipfs.data).filter(([k]) => k !== 'content'),
+                Object.entries(ipfsData).filter(([k]) => k !== 'content'),
               ),
               null,
               2,

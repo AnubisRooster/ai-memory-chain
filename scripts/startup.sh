@@ -77,6 +77,25 @@ log "Polygon Edge is ready."
 wait_for_url "http://localhost:5001/api/v0/id" "IPFS" 15 POST
 log "IPFS is ready."
 
+# ── IPFS peer bootstrap ──────────────────────────────────────────────
+# Connect to known peers from config/peers.json on startup
+PEERS_FILE="$PROJECT_DIR/config/peers.json"
+if [ -f "$PEERS_FILE" ]; then
+  while IFS= read -r addr; do
+    [ -z "$addr" ] && continue
+    case "$addr" in _comment*) continue ;; esac
+    curl -s -X POST "http://localhost:5001/api/v0/swarm/connect?arg=$addr" > /dev/null 2>&1
+    log "IPFS: Attempted connect to $addr"
+  done < <(python3 -c "
+import json
+try:
+    cfg = json.load(open('$PEERS_FILE'))
+    for p in cfg.get('ipfs_peers', []):
+        if not p.startswith('_'): print(p)
+except: pass
+" 2>/dev/null)
+fi
+
 # ── Kill stale processes on our ports ─────────────────────────────────
 for PORT in 3001 3000; do
   PID=$(lsof -ti:"$PORT" 2>/dev/null)
@@ -164,6 +183,23 @@ while ! curl -sf -o /dev/null http://localhost:3000 2>&1; do
   sleep 2
 done
 log "Frontend health check passed."
+
+
+# ── Start CPU watchdog ────────────────────────────────────────────────
+WATCHDOG="$PROJECT_DIR/scripts/watchdog.sh"
+if [ -x "$WATCHDOG" ]; then
+  "$WATCHDOG" --stop 2>/dev/null
+  "$WATCHDOG" --daemon
+  log "CPU watchdog started."
+fi
+
+# ── Start self-heal daemon ───────────────────────────────────────────
+SELF_HEAL="$PROJECT_DIR/scripts/self-heal.sh"
+if [ -x "$SELF_HEAL" ]; then
+  "$SELF_HEAL" --stop 2>/dev/null
+  "$SELF_HEAL" --daemon
+  log "Self-heal daemon started."
+fi
 
 log "=== AI Memory Chain startup complete ==="
 log "  Backend:  http://localhost:3001  (PID $BACKEND_PID)"

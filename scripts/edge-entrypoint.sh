@@ -49,5 +49,7 @@ exec polygon-edge server \
   --chain "$GENESIS_FILE" \
   --grpc-address 0.0.0.0:10000 \
   --jsonrpc 0.0.0.0:8545 \
+  --libp2p 0.0.0.0:1478 \
+  --nat 192.168.68.66 \
   --seal \
   --log-level INFO

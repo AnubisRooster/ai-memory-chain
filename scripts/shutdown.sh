@@ -5,6 +5,13 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_DIR/startup.log"; }
 
 log "=== AI Memory Chain shutdown ==="
 
+# Stop daemons first
+SELF_HEAL="$PROJECT_DIR/scripts/self-heal.sh"
+[ -x "$SELF_HEAL" ] && "$SELF_HEAL" --stop 2>/dev/null
+
+WATCHDOG="$PROJECT_DIR/scripts/watchdog.sh"
+[ -x "$WATCHDOG" ] && "$WATCHDOG" --stop 2>/dev/null
+
 # Graceful stop via PID files
 for svc in backend frontend; do
   pidfile="$LOG_DIR/${svc}.pid"

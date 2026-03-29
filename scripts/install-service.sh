@@ -200,6 +200,23 @@ while ! curl -sf -o /dev/null http://localhost:3000 2>&1; do
 done
 log "Frontend health check passed."
 
+
+# ── Start CPU watchdog ────────────────────────────────────────────────
+WATCHDOG="$PROJECT_DIR/scripts/watchdog.sh"
+if [ -x "$WATCHDOG" ]; then
+  "$WATCHDOG" --stop 2>/dev/null
+  "$WATCHDOG" --daemon
+  log "CPU watchdog started."
+fi
+
+# ── Start self-heal daemon ───────────────────────────────────────────
+SELF_HEAL="$PROJECT_DIR/scripts/self-heal.sh"
+if [ -x "$SELF_HEAL" ]; then
+  "$SELF_HEAL" --stop 2>/dev/null
+  "$SELF_HEAL" --daemon
+  log "Self-heal daemon started."
+fi
+
 log "=== AI Memory Chain startup complete ==="
 log "  Backend:  http://localhost:3001  (PID $BACKEND_PID)"
 log "  Frontend: http://localhost:3000  (PID $FRONTEND_PID)"
@@ -217,6 +234,13 @@ LOG_DIR="$PROJECT_DIR/logs"
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_DIR/startup.log"; }
 
 log "=== AI Memory Chain shutdown ==="
+
+# Stop daemons first
+SELF_HEAL="$PROJECT_DIR/scripts/self-heal.sh"
+[ -x "$SELF_HEAL" ] && "$SELF_HEAL" --stop 2>/dev/null
+
+WATCHDOG="$PROJECT_DIR/scripts/watchdog.sh"
+[ -x "$WATCHDOG" ] && "$WATCHDOG" --stop 2>/dev/null
 
 # Graceful stop via PID files
 for svc in backend frontend; do

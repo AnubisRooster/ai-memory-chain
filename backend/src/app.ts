@@ -6,6 +6,7 @@ import memoryRouter from './routes/memory';
 import searchRouter from './routes/search';
 import auditRouter from './routes/audit';
 import ipfsProxyRouter from './routes/ipfs-proxy';
+import { getHealthState } from './services/health-monitor';
 
 export function createApp(): Express {
   const app = express();
@@ -22,7 +23,21 @@ export function createApp(): Express {
   app.use('/ipfs', ipfsProxyRouter);
 
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', service: 'ai-memory-backend' });
+    const monitor = getHealthState();
+    const degraded = !monitor.polygon || !monitor.ipfs;
+    res.json({
+      status: degraded ? 'degraded' : 'ok',
+      service: 'ai-memory-backend',
+      infrastructure: {
+        polygon: monitor.polygon,
+        ipfs: monitor.ipfs,
+        polygonPeers: monitor.polygonPeers,
+        blockNumber: monitor.lastBlockNumber,
+        blockStaleSeconds: monitor.blockStaleSeconds,
+      },
+      uptime: monitor.uptimeSeconds,
+      checksRun: monitor.checksRun,
+    });
   });
 
   app.get('/connect', (_req, res) => {

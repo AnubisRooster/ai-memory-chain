@@ -6,6 +6,7 @@ services:
     ports:
       - "8545:8545"
       - "10000:10000"
+      - "1478:1478"
     volumes:
       - ./data/polygon-edge:/data
       - ./scripts/edge-entrypoint.sh:/entrypoint.sh:ro

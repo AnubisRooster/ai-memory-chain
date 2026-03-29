@@ -17,6 +17,13 @@
     "build": "pnpm --filter backend build && pnpm --filter frontend build",
     "start": "bash scripts/startup.sh",
     "stop": "bash scripts/shutdown.sh",
+    "watchdog": "bash scripts/watchdog.sh --daemon",
+    "watchdog:stop": "bash scripts/watchdog.sh --stop",
+    "watchdog:status": "bash scripts/watchdog.sh --status",
+    "self-heal": "bash scripts/self-heal.sh --daemon",
+    "self-heal:stop": "bash scripts/self-heal.sh --stop",
+    "self-heal:status": "bash scripts/self-heal.sh --status",
+    "self-heal:once": "bash scripts/self-heal.sh --run-once",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write '**/*.{ts,tsx,json,sol,md}'"
   },
