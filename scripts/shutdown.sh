@@ -12,6 +12,9 @@ SELF_HEAL="$PROJECT_DIR/scripts/self-heal.sh"
 WATCHDOG="$PROJECT_DIR/scripts/watchdog.sh"
 [ -x "$WATCHDOG" ] && "$WATCHDOG" --stop 2>/dev/null
 
+DISCOVERY="$PROJECT_DIR/scripts/discovery.sh"
+[ -x "$DISCOVERY" ] && "$DISCOVERY" --stop 2>/dev/null
+
 # Graceful stop via PID files
 for svc in backend frontend; do
   pidfile="$LOG_DIR/${svc}.pid"

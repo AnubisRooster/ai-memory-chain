@@ -6,6 +6,7 @@ import memoryRouter from './routes/memory';
 import searchRouter from './routes/search';
 import auditRouter from './routes/audit';
 import ipfsProxyRouter from './routes/ipfs-proxy';
+import validatorRouter from './routes/validator';
 import { getHealthState } from './services/health-monitor';
 
 export function createApp(): Express {
@@ -21,6 +22,7 @@ export function createApp(): Express {
   app.use('/search', searchRouter);
   app.use('/security', auditRouter);
   app.use('/ipfs', ipfsProxyRouter);
+  app.use('/validator', validatorRouter);
 
   app.get('/health', (_req, res) => {
     const monitor = getHealthState();

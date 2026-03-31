@@ -11,6 +11,12 @@ services:
       - ./data/polygon-edge:/data
       - ./scripts/edge-entrypoint.sh:/entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    environment:
+      - EDGE_MODE=${EDGE_MODE:-founder}
+      - NAT_IP=${NAT_IP:-}
+      - BOOTNODE=${BOOTNODE:-}
+      - FOUNDER_API=${FOUNDER_API:-}
+      - GENESIS_JSON=${GENESIS_JSON:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8545"]
       interval: 10s

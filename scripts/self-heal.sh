@@ -34,6 +34,7 @@ PIN_RECONCILE_INTERVAL=900      # 15 min
 SYNC_CHECK_INTERVAL=120         # 2 min
 DOCKER_CHECK_INTERVAL=180       # 3 min
 BACKEND_CHECK_INTERVAL=60       # 1 min
+VALIDATOR_CHECK_INTERVAL=120    # 2 min
 
 MAX_LOG_BYTES=5242880  # 5 MB
 
@@ -539,6 +540,130 @@ except Exception as e:
   esac
 }
 
+# ── 7. Validator Set Monitor ────────────────────────────────────────
+#
+# Monitors the IBFT validator set for changes and ensures pending
+# candidates are being processed. Logs validator join/exit events.
+#
+task_validator_monitor() {
+  # Get current validator list from the backend API
+  local validator_data
+  validator_data=$(curl -s --max-time 5 "http://localhost:3001/validator/list" 2>/dev/null)
+
+  if [ -z "$validator_data" ]; then
+    return
+  fi
+
+  local current_count
+  current_count=$(echo "$validator_data" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
+
+  if [ -z "$current_count" ]; then
+    return
+  fi
+
+  # Track validator count changes
+  local count_file="$STATE_DIR/validator-count"
+  if [ -f "$count_file" ]; then
+    local prev_count
+    prev_count=$(cat "$count_file")
+    if [ "$current_count" != "$prev_count" ]; then
+      log "VALIDATOR: Set changed — was $prev_count, now $current_count validators"
+
+      # Get the full list for logging
+      local validators
+      validators=$(echo "$validator_data" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for v in data.get('validators', []):
+    print('  ' + v)
+" 2>/dev/null)
+      log "VALIDATOR: Current set:
+$validators"
+    fi
+  fi
+  echo "$current_count" > "$count_file"
+
+  # Check for pending candidates that need attention
+  local candidates
+  candidates=$(curl -s --max-time 5 "http://localhost:3001/validator/candidates" 2>/dev/null)
+
+  if [ -n "$candidates" ]; then
+    local pending
+    pending=$(echo "$candidates" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+cands = data.get('candidates', [])
+if cands:
+    for c in cands:
+        print(c.get('address','?') + ' (add=' + str(c.get('vote', '?')) + ')')
+" 2>/dev/null)
+
+    if [ -n "$pending" ]; then
+      log "VALIDATOR: Pending candidates:
+$pending"
+    fi
+  fi
+
+  # Check peer count and warn if it drops to zero with multiple validators
+  local peer_count
+  peer_count=$(echo "$validator_data" | python3 -c "import sys,json; print(json.load(sys.stdin).get('peerCount',0))" 2>/dev/null)
+
+  if [ "$current_count" -gt 1 ] && [ "$peer_count" = "0" ]; then
+    log "VALIDATOR WARNING: $current_count validators configured but 0 peers connected — possible network partition"
+
+    # Try to reconnect to known polygon bootnodes
+    if [ -f "$PEERS_FILE" ]; then
+      local bootnodes
+      bootnodes=$(python3 -c "
+import json
+cfg = json.load(open('$PEERS_FILE'))
+for b in cfg.get('polygon_bootnodes', []):
+    print(b)
+" 2>/dev/null)
+
+      if [ -n "$bootnodes" ]; then
+        log "VALIDATOR: Attempting to reconnect to known bootnodes..."
+        # Polygon Edge auto-reconnects via libp2p, but we can log the state
+      fi
+    fi
+  fi
+
+  # Update validator status in peers.json if we track validators there
+  if [ -f "$PEERS_FILE" ]; then
+    python3 -c "
+import json, sys
+
+try:
+    peers = json.load(open('$PEERS_FILE'))
+    validators_section = peers.get('validators', {})
+    if not validators_section:
+        sys.exit(0)
+
+    current_set = json.loads('$validator_data').get('validators', [])
+    current_lower = [v.lower() for v in current_set]
+
+    changed = False
+    for addr, info in validators_section.items():
+        if addr.lower() in current_lower:
+            if info.get('status') != 'active':
+                info['status'] = 'active'
+                changed = True
+        else:
+            if info.get('status') == 'active':
+                info['status'] = 'removed'
+                changed = True
+
+    if changed:
+        peers['validators'] = validators_section
+        with open('$PEERS_FILE', 'w') as f:
+            json.dump(peers, f, indent=2)
+            f.write('\n')
+except Exception:
+    pass
+" 2>/dev/null
+  fi
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # Main loop
 # ═══════════════════════════════════════════════════════════════════════
@@ -566,6 +691,10 @@ run_tasks() {
 
   if should_run "integrity-check" "$PIN_RECONCILE_INTERVAL"; then
     task_integrity_spot_check
+  fi
+
+  if should_run "validator-monitor" "$VALIDATOR_CHECK_INTERVAL"; then
+    task_validator_monitor
   fi
 }
 

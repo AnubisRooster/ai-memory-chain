@@ -201,6 +201,14 @@ if [ -x "$SELF_HEAL" ]; then
   log "Self-heal daemon started."
 fi
 
+# ── Start LAN discovery daemon (advertise as founder) ────────────────
+DISCOVERY="$PROJECT_DIR/scripts/discovery.sh"
+if [ -x "$DISCOVERY" ]; then
+  "$DISCOVERY" --stop 2>/dev/null
+  "$DISCOVERY" --daemon
+  log "LAN discovery daemon started (advertising as founder)."
+fi
+
 log "=== AI Memory Chain startup complete ==="
 log "  Backend:  http://localhost:3001  (PID $BACKEND_PID)"
 log "  Frontend: http://localhost:3000  (PID $FRONTEND_PID)"

@@ -4,11 +4,13 @@
 
   "ipfs_peers": [
     "/ip4/192.168.68.63/tcp/4001/p2p/12D3KooWGsmZhTnSrnUXUmkX9VSUbtKPUYMQ5oqJaWMjZvek63n1"
-    ],
+  ],
   "polygon_bootnodes": [],
 
   "local": {
     "ipfs_id": "12D3KooWMuMzdcsGEVGu1ah67QNjgJHfBiBc9ipvJEQbZKt2yqS7",
     "polygon_bootnode": "/ip4/127.0.0.1/tcp/10001/p2p/16Uiu2HAm1As9Ncbp2y34TFHkXvKU5agL9XpVmSktsM3hEqSoEH2H"
-  }
+  },
+
+  "validators": {}
 }
