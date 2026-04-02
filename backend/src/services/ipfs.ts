@@ -6,6 +6,39 @@ const IPFS_GATEWAY = process.env.IPFS_GATEWAY_URL || 'http://127.0.0.1:8080';
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_RESPONSE_BYTES = 50 * 1024 * 1024; // 50 MB safety cap
 
+// ── LRU Cache for IPFS content ──────────────────────────────────────
+// Serves content even when IPFS is temporarily unreachable.
+const CACHE_MAX_ENTRIES = parseInt(process.env.IPFS_CACHE_SIZE || '500', 10);
+
+class LRUCache<V> {
+  private map = new Map<string, V>();
+  constructor(private maxSize: number) {}
+
+  get(key: string): V | undefined {
+    const val = this.map.get(key);
+    if (val !== undefined) {
+      this.map.delete(key);
+      this.map.set(key, val);
+    }
+    return val;
+  }
+
+  set(key: string, val: V): void {
+    this.map.delete(key);
+    if (this.map.size >= this.maxSize) {
+      const oldest = this.map.keys().next().value;
+      if (oldest !== undefined) this.map.delete(oldest);
+    }
+    this.map.set(key, val);
+  }
+
+  get size(): number {
+    return this.map.size;
+  }
+}
+
+const contentCache = new LRUCache<IPFSContent>(CACHE_MAX_ENTRIES);
+
 async function withRetry<T>(fn: () => Promise<T>, retries = 2, delayMs = 500): Promise<T> {
   let lastErr: Error | undefined;
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -136,6 +169,7 @@ export async function uploadJSON(content: IPFSContent): Promise<string> {
   return withRetry(async () => {
     const raw = await postMultipart('/add?pin=true', Buffer.from(json), 'data.json', 'application/json');
     const result = JSON.parse(raw);
+    contentCache.set(result.Hash, content);
     return result.Hash;
   });
 }
@@ -153,10 +187,21 @@ export async function uploadBuffer(
 }
 
 export async function fetchJSON(cid: string): Promise<IPFSContent> {
-  return withRetry(async () => {
-    const buf = await httpGet(`${IPFS_GATEWAY}/ipfs/${cid}`);
-    return JSON.parse(buf.toString('utf-8')) as IPFSContent;
-  });
+  try {
+    const content = await withRetry(async () => {
+      const buf = await httpGet(`${IPFS_GATEWAY}/ipfs/${cid}`);
+      return JSON.parse(buf.toString('utf-8')) as IPFSContent;
+    });
+    contentCache.set(cid, content);
+    return content;
+  } catch (err) {
+    const cached = contentCache.get(cid);
+    if (cached) {
+      console.warn(`[ipfs] IPFS unreachable for ${cid} — serving from cache`);
+      return cached;
+    }
+    throw err;
+  }
 }
 
 export async function isIPFSOnline(): Promise<boolean> {

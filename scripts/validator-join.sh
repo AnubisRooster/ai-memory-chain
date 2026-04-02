@@ -129,16 +129,34 @@ fi
 
 FOUNDER_API="http://${FOUNDER_IP}:${FOUNDER_API_PORT}"
 
-# ── Step 2: Fetch Join Info from Founder ─────────────────────────────
+# ── Step 2: Fetch Join Info from Any Available Node ──────────────────
 
-log "Step 2: Fetching network info from founder at $FOUNDER_API..."
+log "Step 2: Fetching network info from $FOUNDER_API..."
 
 JOIN_INFO=$(curl -sf --max-time 10 "$FOUNDER_API/validator/join-info" 2>/dev/null)
 
 if [ -z "$JOIN_INFO" ]; then
-  echo "ERROR: Could not reach founder API at $FOUNDER_API/validator/join-info"
-  echo "Make sure the founder's backend is running."
-  exit 1
+  log "  Primary node unreachable. Trying peer discovery..."
+
+  # Try scanning common LAN IPs on the expected API port
+  LOCAL_SUBNET=$(get_lan_ip | sed 's/\.[0-9]*$/./')
+  for i in $(seq 1 254); do
+    PEER_IP="${LOCAL_SUBNET}${i}"
+    PEER_INFO=$(curl -sf --max-time 2 "http://${PEER_IP}:${FOUNDER_API_PORT}/validator/join-info" 2>/dev/null)
+    if [ -n "$PEER_INFO" ]; then
+      log "  Found active node at $PEER_IP"
+      JOIN_INFO="$PEER_INFO"
+      FOUNDER_IP="$PEER_IP"
+      FOUNDER_API="http://${FOUNDER_IP}:${FOUNDER_API_PORT}"
+      break
+    fi
+  done
+
+  if [ -z "$JOIN_INFO" ]; then
+    echo "ERROR: Could not reach any validator node."
+    echo "Make sure at least one node's backend is running."
+    exit 1
+  fi
 fi
 
 # Extract connection details
@@ -232,19 +250,46 @@ if [ -n "$NODE_ADDRESS" ] && [ -n "$NODE_ID" ]; then
   log "  Address: $NODE_ADDRESS"
   log "  Node ID: $NODE_ID"
 
-  # Announce to founder
+  ANNOUNCE_BODY="{\"address\":\"$NODE_ADDRESS\",\"nodeId\":\"$NODE_ID\",\"ip\":\"$LOCAL_IP\",\"port\":1478,\"apiPort\":${FOUNDER_API_PORT}}"
+
+  # Announce to the primary node (it will propagate to others)
   ANNOUNCE_RESULT=$(curl -sf --max-time 10 -X POST \
     -H "Content-Type: application/json" \
-    -d "{\"address\":\"$NODE_ADDRESS\",\"nodeId\":\"$NODE_ID\",\"ip\":\"$LOCAL_IP\",\"port\":1478}" \
+    -d "$ANNOUNCE_BODY" \
     "$FOUNDER_API/validator/announce" 2>/dev/null)
 
   if echo "$ANNOUNCE_RESULT" | grep -q '"success"'; then
     log "  Announced successfully — validator proposal submitted!"
-    echo "$ANNOUNCE_RESULT" | python3 -c "import sys,json; d=json.load(sys.stdin); print('  Status:', d.get('action','unknown'), '-', d.get('message',''))" 2>/dev/null
+    PEERS_PROPAGATED=$(echo "$ANNOUNCE_RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('peersPropagated',0))" 2>/dev/null)
+    log "  Proposal propagated to $PEERS_PROPAGATED additional peers"
   else
-    echo "WARNING: Announcement failed. You may need to manually propose this validator."
-    echo "  On the founder node, run:"
-    echo "  curl -X POST http://localhost:3001/validator/propose -H 'Content-Type: application/json' -d '{\"address\":\"$NODE_ADDRESS\"}'"
+    log "  Primary announce failed. Trying to announce to all known peers..."
+
+    # Fetch peer list and announce to each independently
+    PEER_LIST=$(curl -sf --max-time 5 "$FOUNDER_API/validator/peers" 2>/dev/null)
+    if [ -n "$PEER_LIST" ]; then
+      echo "$PEER_LIST" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for v in data.get('registeredValidators', []):
+    if v.get('ip') and v.get('status') != 'removed':
+        print(f\"http://{v['ip']}:{v.get('apiPort', 3001)}\")
+for api in data.get('peerApis', []):
+    print(api)
+" 2>/dev/null | sort -u | while read -r PEER_URL; do
+        RESULT=$(curl -sf --max-time 5 -X POST \
+          -H "Content-Type: application/json" \
+          -d "$ANNOUNCE_BODY" \
+          "$PEER_URL/validator/announce" 2>/dev/null)
+        if echo "$RESULT" | grep -q '"success"'; then
+          log "  Announced to peer: $PEER_URL"
+        fi
+      done
+    else
+      echo "WARNING: Could not reach any peer for announcement."
+      echo "  You can manually propose this validator on any running node:"
+      echo "  curl -X POST <NODE_API>/validator/propose -H 'Content-Type: application/json' -d '{\"address\":\"$NODE_ADDRESS\"}'"
+    fi
   fi
 fi
 

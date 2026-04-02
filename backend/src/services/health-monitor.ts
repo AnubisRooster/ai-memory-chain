@@ -1,5 +1,13 @@
 import { isPolygonOnline, getProvider } from './blockchain';
 import { isIPFSOnline } from './ipfs';
+import { getValidators, getPeerCount } from './validator';
+
+interface ValidatorLiveness {
+  address: string;
+  lastSeen: number;
+  reachable: boolean;
+  consecutiveFailures: number;
+}
 
 interface HealthState {
   polygon: boolean;
@@ -9,6 +17,9 @@ interface HealthState {
   polygonPeers: number;
   uptimeSeconds: number;
   checksRun: number;
+  validatorCount: number;
+  validatorLiveness: Record<string, ValidatorLiveness>;
+  chainStalled: boolean;
 }
 
 const state: HealthState = {
@@ -19,12 +30,16 @@ const state: HealthState = {
   polygonPeers: 0,
   uptimeSeconds: 0,
   checksRun: 0,
+  validatorCount: 0,
+  validatorLiveness: {},
+  chainStalled: false,
 };
 
 const startTime = Date.now();
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
 const CHECK_INTERVAL_MS = 30_000;
+const STALE_THRESHOLD_MS = 300_000; // 5 min with no new blocks = stalled
 
 async function runCheck(): Promise<void> {
   state.checksRun++;
@@ -54,9 +69,19 @@ async function runCheck(): Promise<void> {
 
       const peerCountHex = await provider.send('net_peerCount', []);
       state.polygonPeers = parseInt(peerCountHex, 16) || 0;
+
+      // Stall detection
+      const staleDuration = Date.now() - state.lastBlockAdvancedAt;
+      state.chainStalled = staleDuration > STALE_THRESHOLD_MS;
     } catch {
       // RPC call failed; polygon might have just gone offline
     }
+
+    // Track validator set size
+    try {
+      const validators = await getValidators();
+      state.validatorCount = validators.length;
+    } catch {}
   }
 
   if (!state.polygon || !state.ipfs) {
@@ -65,13 +90,16 @@ async function runCheck(): Promise<void> {
     if (!state.ipfs) downServices.push('IPFS');
     console.warn(`[health-monitor] Infrastructure degraded: ${downServices.join(', ')} offline`);
   }
+
+  if (state.chainStalled) {
+    console.warn(`[health-monitor] Chain appears stalled (no new blocks for ${Math.floor((Date.now() - state.lastBlockAdvancedAt) / 1000)}s)`);
+  }
 }
 
 export function startHealthMonitor(): void {
   if (intervalId) return;
   console.log('[health-monitor] Starting background health monitor (30s interval)');
 
-  // Initial check after a short delay to let services stabilize
   setTimeout(() => {
     runCheck().catch(() => {});
   }, 5_000);

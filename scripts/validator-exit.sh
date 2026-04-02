@@ -155,26 +155,40 @@ if [ "$IS_VALIDATOR" != "no" ]; then
     log "  Direct RPC removal vote submitted"
   fi
 
-  # Also ask the founder and other known peers to vote for our removal
-  log "  Requesting removal votes from known peers..."
+  # Ask ALL known peers to vote for our removal (not just founder)
+  log "  Requesting removal votes from all known peers..."
 
   PEERS_FILE="$CONFIG_DIR/peers.json"
   if [ -f "$PEERS_FILE" ]; then
-    # Check for founder API
-    FOUNDER_API=$(python3 -c "
+    PEER_APIS=$(python3 -c "
 import json
 cfg = json.load(open('$PEERS_FILE'))
-print(cfg.get('founder', {}).get('api', ''))
+apis = set()
+founder_api = cfg.get('founder', {}).get('api', '')
+if founder_api:
+    apis.add(founder_api)
+for addr, info in cfg.get('validators', {}).items():
+    ip = info.get('ip', '')
+    if ip and info.get('status') != 'removed':
+        apis.add(f\"http://{ip}:{info.get('apiPort', 3001)}\")
+for api in cfg.get('peer_apis', []):
+    apis.add(api)
+for a in apis:
+    print(a)
 " 2>/dev/null)
 
-    if [ -n "$FOUNDER_API" ]; then
-      curl -sf --max-time 5 -X POST \
+    VOTES_RECEIVED=0
+    for PEER_URL in $PEER_APIS; do
+      RESULT=$(curl -sf --max-time 5 -X POST \
         -H "Content-Type: application/json" \
         -d "{\"address\":\"$NODE_ADDRESS\"}" \
-        "$FOUNDER_API/validator/remove" 2>/dev/null && \
-        log "  Founder voted for removal" || \
-        log "  Could not reach founder for removal vote"
-    fi
+        "$PEER_URL/validator/remove" 2>/dev/null)
+      if echo "$RESULT" | grep -q '"success"'; then
+        VOTES_RECEIVED=$((VOTES_RECEIVED + 1))
+        log "  Removal vote from $PEER_URL"
+      fi
+    done
+    log "  Received $VOTES_RECEIVED removal votes from peers"
   fi
 fi
 

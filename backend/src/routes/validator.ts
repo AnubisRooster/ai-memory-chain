@@ -5,11 +5,13 @@
  *
  *   GET  /validator/list          — current validator set
  *   GET  /validator/candidates    — pending candidate votes
- *   GET  /validator/status        — IBFT consensus status
- *   GET  /validator/join-info     — connection details for joining nodes
+ *   GET  /validator/status        — IBFT consensus status + liveness
+ *   GET  /validator/join-info     — connection details for joining nodes (any validator can serve)
+ *   GET  /validator/peers         — known network peers for multi-node discovery
  *   POST /validator/propose       — vote to add a new validator
  *   POST /validator/remove        — vote to remove a validator
- *   POST /validator/announce      — a new node announces itself for auto-approval
+ *   POST /validator/announce      — a new node announces itself (any validator can approve)
+ *   POST /validator/propagate     — forward a proposal to peer validators
  */
 
 import { Router, Request, Response } from 'express';
@@ -26,7 +28,57 @@ import {
   getLocalNodeInfo,
 } from '../services/validator';
 
-const router = Router();
+const router: ReturnType<typeof Router> = Router();
+
+const PEERS_PATH = path.resolve(__dirname, '..', '..', '..', 'config', 'peers.json');
+
+function readPeersConfig(): Record<string, any> {
+  try {
+    if (fs.existsSync(PEERS_PATH)) {
+      return JSON.parse(fs.readFileSync(PEERS_PATH, 'utf-8'));
+    }
+  } catch {}
+  return {};
+}
+
+function writePeersConfig(config: Record<string, any>): void {
+  try {
+    fs.writeFileSync(PEERS_PATH, JSON.stringify(config, null, 2) + '\n');
+  } catch (e) {
+    console.warn('[VALIDATOR] Could not write peers.json:', e);
+  }
+}
+
+/**
+ * Get known peer API endpoints from peers.json for propagating proposals.
+ * Returns URLs like ["http://192.168.1.10:3001", "http://192.168.1.11:3001"]
+ */
+function getKnownPeerApis(): string[] {
+  const config = readPeersConfig();
+  const apis: string[] = [];
+
+  if (config.founder?.api) apis.push(config.founder.api);
+
+  const validators = config.validators || {};
+  for (const [, info] of Object.entries(validators) as [string, any][]) {
+    if (info.ip && info.status !== 'removed') {
+      const apiPort = info.apiPort || 3001;
+      apis.push(`http://${info.ip}:${apiPort}`);
+    }
+  }
+
+  if (config.peer_apis && Array.isArray(config.peer_apis)) {
+    apis.push(...config.peer_apis);
+  }
+
+  // Deduplicate and exclude self
+  const localInfo = getLocalNodeInfo();
+  const selfUrls = new Set([
+    `http://127.0.0.1:3001`, `http://localhost:3001`,
+    localInfo.rpcUrl.replace(':8545', ':3001'),
+  ]);
+  return [...new Set(apis)].filter((url) => !selfUrls.has(url));
+}
 
 // ── GET /validator/list ─────────────────────────────────────────────
 // Returns the current IBFT validator set.
@@ -198,13 +250,14 @@ router.post('/remove', async (req: Request, res: Response) => {
 });
 
 // ── POST /validator/announce ────────────────────────────────────────
-// A new node announces itself to the founder node for auto-approval.
-// Body: { "address": "0x...", "nodeId": "16Uiu...", "ip": "192.168.x.x", "port": 1478 }
+// A new node announces itself to ANY validator node for approval.
+// Body: { "address": "0x...", "nodeId": "16Uiu...", "ip": "192.168.x.x", "port": 1478, "apiPort": 3001 }
 //
-// The founder node will automatically propose the new validator via IBFT vote.
+// This node votes to add it AND propagates the proposal to all known peers
+// so they can cast their own IBFT votes (required for multi-validator majority).
 router.post('/announce', async (req: Request, res: Response) => {
   try {
-    const { address, nodeId, ip, port } = req.body;
+    const { address, nodeId, ip, port, apiPort } = req.body;
 
     if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
       return res.status(400).json({ error: 'Invalid validator address' });
@@ -213,7 +266,6 @@ router.post('/announce', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Missing nodeId (libp2p peer ID)' });
     }
 
-    // Check if already a validator
     const alreadyValidator = await isValidator(address);
     if (alreadyValidator) {
       return res.json({
@@ -224,40 +276,43 @@ router.post('/announce', async (req: Request, res: Response) => {
       });
     }
 
-    // Auto-approve: vote to add the new validator
     const success = await proposeValidator(address);
 
-    // Track the new peer in peers.json for reconnection
     if (ip && nodeId) {
-      const peersPath = path.resolve(__dirname, '..', '..', '..', 'config', 'peers.json');
-      try {
-        const peersConfig = JSON.parse(fs.readFileSync(peersPath, 'utf-8'));
-        const multiaddr = `/ip4/${ip}/tcp/${port || 1478}/p2p/${nodeId}`;
+      const peersConfig = readPeersConfig();
+      const multiaddr = `/ip4/${ip}/tcp/${port || 1478}/p2p/${nodeId}`;
 
-        if (!peersConfig.polygon_bootnodes) {
-          peersConfig.polygon_bootnodes = [];
-        }
-        // Avoid duplicates
-        if (!peersConfig.polygon_bootnodes.includes(multiaddr)) {
-          peersConfig.polygon_bootnodes.push(multiaddr);
-          fs.writeFileSync(peersPath, JSON.stringify(peersConfig, null, 2) + '\n');
-          console.log(`[VALIDATOR] Added peer ${multiaddr} to peers.json`);
-        }
+      if (!peersConfig.polygon_bootnodes) peersConfig.polygon_bootnodes = [];
+      if (!peersConfig.polygon_bootnodes.includes(multiaddr)) {
+        peersConfig.polygon_bootnodes.push(multiaddr);
+        console.log(`[VALIDATOR] Added peer ${multiaddr} to peers.json`);
+      }
 
-        // Also track in the validators registry
-        if (!peersConfig.validators) {
-          peersConfig.validators = {};
-        }
-        peersConfig.validators[address.toLowerCase()] = {
-          nodeId,
-          ip,
-          port: port || 1478,
-          joinedAt: new Date().toISOString(),
-          status: 'proposed',
-        };
-        fs.writeFileSync(peersPath, JSON.stringify(peersConfig, null, 2) + '\n');
-      } catch (e) {
-        console.warn('[VALIDATOR] Could not update peers.json:', e);
+      if (!peersConfig.validators) peersConfig.validators = {};
+      peersConfig.validators[address.toLowerCase()] = {
+        nodeId,
+        ip,
+        port: port || 1478,
+        apiPort: apiPort || 3001,
+        joinedAt: new Date().toISOString(),
+        status: 'proposed',
+      };
+      writePeersConfig(peersConfig);
+    }
+
+    // Propagate to all known peer validators so they cast their own IBFT votes.
+    // Fire-and-forget — we don't block the response on peer propagation.
+    const propagateBody = { address, nodeId, ip, port: port || 1478, apiPort: apiPort || 3001 };
+    const peerApis = getKnownPeerApis();
+    if (peerApis.length > 0) {
+      console.log(`[VALIDATOR] Propagating proposal for ${address} to ${peerApis.length} peers`);
+      for (const peerApi of peerApis) {
+        fetch(`${peerApi}/validator/propagate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(propagateBody),
+          signal: AbortSignal.timeout(5_000),
+        }).catch(() => {});
       }
     }
 
@@ -267,6 +322,7 @@ router.post('/announce', async (req: Request, res: Response) => {
         success: true,
         action: 'proposed',
         address,
+        peersPropagated: peerApis.length,
         message: 'Validator proposed for addition. Will be active after epoch boundary.',
       });
     } else {
@@ -274,6 +330,76 @@ router.post('/announce', async (req: Request, res: Response) => {
     }
   } catch (err: any) {
     res.status(500).json({ error: 'Announce failed', detail: err.message });
+  }
+});
+
+// ── POST /validator/propagate ──────────────────────────────────────
+// Receives a proposal from a peer validator and casts a local IBFT vote.
+// This enables multi-validator majority without needing the founder.
+// Body: { "address": "0x...", "nodeId": "...", "ip": "...", "port": 1478, "apiPort": 3001 }
+router.post('/propagate', async (req: Request, res: Response) => {
+  try {
+    const { address, nodeId, ip, port, apiPort } = req.body;
+
+    if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
+      return res.status(400).json({ error: 'Invalid address' });
+    }
+
+    const alreadyValidator = await isValidator(address);
+    if (alreadyValidator) {
+      return res.json({ success: true, action: 'already_validator', address });
+    }
+
+    const success = await proposeValidator(address);
+
+    // Track the peer locally too
+    if (ip && nodeId) {
+      const peersConfig = readPeersConfig();
+      const multiaddr = `/ip4/${ip}/tcp/${port || 1478}/p2p/${nodeId}`;
+      if (!peersConfig.polygon_bootnodes) peersConfig.polygon_bootnodes = [];
+      if (!peersConfig.polygon_bootnodes.includes(multiaddr)) {
+        peersConfig.polygon_bootnodes.push(multiaddr);
+      }
+      if (!peersConfig.validators) peersConfig.validators = {};
+      if (!peersConfig.validators[address.toLowerCase()]) {
+        peersConfig.validators[address.toLowerCase()] = {
+          nodeId, ip, port: port || 1478, apiPort: apiPort || 3001,
+          joinedAt: new Date().toISOString(), status: 'proposed',
+        };
+      }
+      writePeersConfig(peersConfig);
+    }
+
+    console.log(`[VALIDATOR] Propagated vote: ${success ? 'proposed' : 'failed'} for ${address}`);
+    res.json({ success, action: success ? 'voted' : 'vote_failed', address });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Propagate failed', detail: err.message });
+  }
+});
+
+// ── GET /validator/peers ────────────────────────────────────────────
+// Returns known peer API endpoints for multi-node discovery.
+// A joining node can ask any validator for the full list of peers
+// and then announce to all of them.
+router.get('/peers', async (_req: Request, res: Response) => {
+  try {
+    const validators = await getValidators();
+    const peerApis = getKnownPeerApis();
+    const peersConfig = readPeersConfig();
+    const registeredValidators = peersConfig.validators || {};
+
+    res.json({
+      validators,
+      peerApis,
+      registeredValidators: Object.entries(registeredValidators).map(([addr, info]: [string, any]) => ({
+        address: addr,
+        ip: info.ip,
+        apiPort: info.apiPort || 3001,
+        status: info.status,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to get peers', detail: err.message });
   }
 });
 

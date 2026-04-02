@@ -26,7 +26,7 @@ export function createApp(): Express {
 
   app.get('/health', (_req, res) => {
     const monitor = getHealthState();
-    const degraded = !monitor.polygon || !monitor.ipfs;
+    const degraded = !monitor.polygon || !monitor.ipfs || monitor.chainStalled;
     res.json({
       status: degraded ? 'degraded' : 'ok',
       service: 'ai-memory-backend',
@@ -36,6 +36,8 @@ export function createApp(): Express {
         polygonPeers: monitor.polygonPeers,
         blockNumber: monitor.lastBlockNumber,
         blockStaleSeconds: monitor.blockStaleSeconds,
+        chainStalled: monitor.chainStalled,
+        validatorCount: monitor.validatorCount,
       },
       uptime: monitor.uptimeSeconds,
       checksRun: monitor.checksRun,

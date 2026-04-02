@@ -20,7 +20,7 @@
 #   scripts/self-heal.sh --run-once   # single pass then exit (for cron/testing)
 #
 
-PROJECT_DIR="/Users/mikefink/Documents/ai-memory-chain"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="$PROJECT_DIR/logs"
 PIDFILE="$LOG_DIR/self-heal.pid"
 LOGFILE="$LOG_DIR/self-heal.log"
@@ -35,6 +35,8 @@ SYNC_CHECK_INTERVAL=120         # 2 min
 DOCKER_CHECK_INTERVAL=180       # 3 min
 BACKEND_CHECK_INTERVAL=60       # 1 min
 VALIDATOR_CHECK_INTERVAL=120    # 2 min
+VALIDATOR_LIVENESS_INTERVAL=300 # 5 min
+IPFS_REPLICATE_INTERVAL=600    # 10 min
 
 MAX_LOG_BYTES=5242880  # 5 MB
 
@@ -664,6 +666,200 @@ except Exception:
   fi
 }
 
+# ── 8. Validator Liveness & Dead Node Eviction ───────────────────────
+#
+# Probes each validator's backend API to detect crashed nodes.
+# After sustained unreachability, proposes removal of dead validators
+# so the remaining set stays above the IBFT 2/3 liveness threshold.
+#
+# SAFETY: Only proposes removal if:
+#   - The validator has been unreachable for EVICTION_THRESHOLD consecutive checks
+#   - Removing it would still leave enough validators for IBFT consensus (>= 2)
+#   - We are not the last validator
+#
+EVICTION_THRESHOLD=3  # consecutive failures before proposing removal
+
+task_validator_liveness() {
+  local validator_data
+  validator_data=$(curl -s --max-time 5 "http://localhost:3001/validator/list" 2>/dev/null)
+
+  if [ -z "$validator_data" ]; then
+    return
+  fi
+
+  local current_count
+  current_count=$(echo "$validator_data" | python3 -c "import sys,json; print(json.load(sys.stdin).get('count',0))" 2>/dev/null)
+
+  # Only relevant with 2+ validators
+  if [ -z "$current_count" ] || [ "$current_count" -lt 2 ]; then
+    return
+  fi
+
+  # Get registered validators with their IPs from peers.json
+  if [ ! -f "$PEERS_FILE" ]; then
+    return
+  fi
+
+  python3 -c "
+import json, sys, urllib.request
+
+peers = json.load(open('$PEERS_FILE'))
+validators_section = peers.get('validators', {})
+if not validators_section:
+    sys.exit(0)
+
+validator_data = json.loads('''$validator_data''')
+active_set = [v.lower() for v in validator_data.get('validators', [])]
+current_count = len(active_set)
+
+for addr, info in validators_section.items():
+    if addr.lower() not in active_set:
+        continue
+    ip = info.get('ip', '')
+    api_port = info.get('apiPort', 3001)
+    if not ip:
+        continue
+
+    # Probe the validator's health endpoint
+    reachable = False
+    try:
+        req = urllib.request.Request(f'http://{ip}:{api_port}/health')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+            if data.get('status') in ('ok', 'degraded'):
+                reachable = True
+    except:
+        pass
+
+    fail_file = '$STATE_DIR/validator-fail-' + addr.lower().replace('0x','')
+    if reachable:
+        # Clear failure counter
+        import os
+        try: os.remove(fail_file)
+        except: pass
+        continue
+
+    # Increment failure counter
+    failures = 0
+    try:
+        with open(fail_file) as f:
+            failures = int(f.read().strip())
+    except:
+        pass
+    failures += 1
+
+    with open(fail_file, 'w') as f:
+        f.write(str(failures))
+
+    print(f'VALIDATOR_LIVENESS: {addr} unreachable ({failures}/$EVICTION_THRESHOLD)')
+
+    if failures >= $EVICTION_THRESHOLD:
+        # Safety: don't evict if it would leave fewer than 2 validators
+        if current_count <= 2:
+            print(f'VALIDATOR_LIVENESS: Would evict {addr} but only {current_count} validators remain — skipping')
+            continue
+
+        print(f'VALIDATOR_LIVENESS: Proposing removal of unresponsive {addr}')
+        try:
+            import urllib.parse
+            req = urllib.request.Request(
+                'http://localhost:3001/validator/remove',
+                data=json.dumps({'address': addr}).encode(),
+                headers={'Content-Type': 'application/json'},
+                method='POST'
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                result = json.loads(resp.read())
+                if result.get('success'):
+                    print(f'VALIDATOR_LIVENESS: Removal vote submitted for {addr}')
+                    # Reset counter so we don't spam votes
+                    with open(fail_file, 'w') as f:
+                        f.write('0')
+        except Exception as e:
+            print(f'VALIDATOR_LIVENESS: Failed to propose removal of {addr}: {e}')
+" 2>/dev/null | while read -r line; do
+    log "$line"
+  done
+}
+
+# ── 9. IPFS Pin Replication ──────────────────────────────────────────
+#
+# Replicates locally pinned CIDs to known IPFS peers, ensuring
+# redundancy across the network. If one IPFS node goes down,
+# content is still retrievable from peers.
+#
+task_ipfs_replicate() {
+  if [ ! -f "$PEERS_FILE" ]; then
+    return
+  fi
+
+  local ipfs_peers
+  ipfs_peers=$(python3 -c "
+import json
+cfg = json.load(open('$PEERS_FILE'))
+validators = cfg.get('validators', {})
+for addr, info in validators.items():
+    ip = info.get('ip', '')
+    if ip and info.get('status') != 'removed':
+        print(ip)
+" 2>/dev/null)
+
+  if [ -z "$ipfs_peers" ]; then
+    return
+  fi
+
+  # Get our locally pinned CIDs
+  local our_pins
+  our_pins=$(curl -s -X POST "http://localhost:5001/api/v0/pin/ls?type=recursive" 2>/dev/null \
+    | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for k in d.get('Keys', {}):
+    print(k)
+" 2>/dev/null)
+
+  if [ -z "$our_pins" ]; then
+    return
+  fi
+
+  local replicated=0
+  local skipped=0
+
+  for peer_ip in $ipfs_peers; do
+    # Check if the peer's IPFS API is reachable
+    if ! curl -s --max-time 3 "http://${peer_ip}:5001/api/v0/id" > /dev/null 2>&1; then
+      continue
+    fi
+
+    # Get the peer's pins
+    local peer_pins
+    peer_pins=$(curl -s --max-time 10 -X POST "http://${peer_ip}:5001/api/v0/pin/ls?type=recursive" 2>/dev/null \
+      | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for k in d.get('Keys', {}):
+    print(k)
+" 2>/dev/null)
+
+    for cid in $our_pins; do
+      if echo "$peer_pins" | grep -q "^${cid}$"; then
+        skipped=$((skipped + 1))
+        continue
+      fi
+
+      # Request the peer to pin this CID (they'll fetch it from us or the network)
+      result=$(curl -s --max-time 30 -X POST "http://${peer_ip}:5001/api/v0/pin/add?arg=$cid" 2>/dev/null)
+      if echo "$result" | grep -q "Pins"; then
+        replicated=$((replicated + 1))
+      fi
+    done
+  done
+
+  if [ "$replicated" -gt 0 ]; then
+    log "IPFS REPLICATE: Pushed $replicated pins to peers ($skipped already present)"
+  fi
+}
+
 # ═══════════════════════════════════════════════════════════════════════
 # Main loop
 # ═══════════════════════════════════════════════════════════════════════
@@ -695,6 +891,14 @@ run_tasks() {
 
   if should_run "validator-monitor" "$VALIDATOR_CHECK_INTERVAL"; then
     task_validator_monitor
+  fi
+
+  if should_run "validator-liveness" "$VALIDATOR_LIVENESS_INTERVAL"; then
+    task_validator_liveness
+  fi
+
+  if should_run "ipfs-replicate" "$IPFS_REPLICATE_INTERVAL"; then
+    task_ipfs_replicate
   fi
 }
 

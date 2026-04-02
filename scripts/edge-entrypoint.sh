@@ -74,7 +74,7 @@ founder_mode() {
       --consensus ibft \
       --ibft-validator-type ecdsa \
       --ibft-validator "$VALIDATOR" \
-      --bootnode "/ip4/127.0.0.1/tcp/10001/p2p/$NODE_ID" \
+      --bootnode "/ip4/127.0.0.1/tcp/1478/p2p/$NODE_ID" \
       --premine "${VALIDATOR}:1000000000000000000000" \
       --block-gas-limit 10000000 \
       --chain-id 100 \
@@ -168,8 +168,8 @@ fi
 
 # Add bootnode connection if provided (joiner mode)
 if [ -n "$BOOTNODE" ]; then
-  # Polygon Edge will connect to this bootnode on startup
   echo "=== Connecting to bootnode: $BOOTNODE ==="
+  SERVER_FLAGS="$SERVER_FLAGS --bootnode $BOOTNODE"
 fi
 
 echo "=== Starting Polygon Edge ==="
