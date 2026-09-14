@@ -1,12 +1,13 @@
-# Graph Report - ai-memory-chain  (2026-09-07)
+# Graph Report - ai-memory-chain  (2026-09-14)
 
 ## Corpus Check
 - 78 files · ~114,885 words
 - Verdict: corpus is large enough that graph structure adds value.
+- Unclassified: 6 file(s) not represented in the graph (top: (none) 3, .sol 1, .jsonl 1)
 
 ## Summary
-- 551 nodes · 810 edges · 32 communities (21 shown, 8 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.85)
+- 551 nodes · 819 edges · 32 communities (21 shown, 8 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.82)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -78,8 +79,8 @@ Cohesion: 0.06
 Nodes (43): createApp(), getLanAddresses(), app, PORT, server, shutdown(), router, router (+35 more)
 
 ### Community 2 - "memory.ts"
-Cohesion: 0.07
-Nodes (39): upload, router, ABI, getContract(), getContractAddress(), getMemoryCount(), getMemoryOnChain(), getMemorySummaryOnChain() (+31 more)
+Cohesion: 0.08
+Nodes (40): upload, deepSearchObject(), router, ABI, getContract(), getContractAddress(), getMemoryCount(), getMemoryOnChain() (+32 more)
 
 ### Community 3 - "package.json"
 Cohesion: 0.04
@@ -126,7 +127,7 @@ Cohesion: 0.12
 Nodes (15): compilerOptions, declaration, esModuleInterop, forceConsistentCasingInFileNames, lib, module, outDir, resolveJsonModule (+7 more)
 
 ### Community 14 - "MemoryAgent"
-Cohesion: 0.20
+Cohesion: 0.21
 Nodes (4): AgentSDKOptions, MemoryAgent, RecordMemoryInput, RecordMemoryResult
 
 ### Community 15 - "watchdog.sh"
@@ -155,7 +156,7 @@ Nodes (3): get_lan_ip(), log(), validator-join.sh script
 
 ## Knowledge Gaps
 - **249 isolated node(s):** `name`, `version`, `private`, `main`, `types` (+244 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 283 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 281 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -168,10 +169,10 @@ _Questions this graph is uniquely positioned to answer:_
 - **What connects `name`, `version`, `private` to the rest of the system?**
   _249 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `api.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05017543859649123 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.051228070175438595 - nodes in this community are weakly interconnected._
 - **Should `app.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.06359189378057302 - nodes in this community are weakly interconnected._
 - **Should `memory.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.07474600870827286 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07764876632801161 - nodes in this community are weakly interconnected._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.044444444444444446 - nodes in this community are weakly interconnected._

@@ -6649,6 +6649,18 @@
       "weight": 1.0
     },
     {
+      "source": "agent_sdk_src_index_memoryagent_request",
+      "target": "agent_sdk_src_index_memoryagent_request",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "agent-sdk/src/index.ts",
+      "source_location": "L80",
+      "weight": 1.0
+    },
+    {
       "source": "backend_src_app_createapp",
       "target": "backend_src_services_health_monitor_gethealthstate",
       "relation": "calls",
@@ -6706,6 +6718,18 @@
       "context": "call",
       "source_file": "backend/src/index.ts",
       "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_routes_search_deepsearchobject",
+      "target": "backend_src_routes_search_deepsearchobject",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "backend/src/routes/search.ts",
+      "source_location": "L35",
       "weight": 1.0
     },
     {
@@ -6814,6 +6838,18 @@
       "context": "call",
       "source_file": "backend/src/services/blockchain.ts",
       "source_location": "L208",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_services_blockchain_getmemorycount",
+      "target": "backend_src_services_blockchain_getmemorycount",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "backend/src/services/blockchain.ts",
+      "source_location": "L209",
       "weight": 1.0
     },
     {
@@ -7153,6 +7189,18 @@
       "weight": 1.0
     },
     {
+      "source": "backend_src_services_security_scandataobject",
+      "target": "backend_src_services_security_scandataobject",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "backend/src/services/security.ts",
+      "source_location": "L230",
+      "weight": 1.0
+    },
+    {
       "source": "backend_src_services_security_scanmemoryinput",
       "target": "backend_src_services_security_scantext",
       "relation": "calls",
@@ -7274,6 +7322,18 @@
     },
     {
       "source": "frontend_src_components_creatememory_creatememory",
+      "target": "frontend_src_lib_api_creatememory",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "frontend/src/components/CreateMemory.tsx",
+      "source_location": "L127",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_creatememory_creatememory",
       "target": "frontend_src_components_creatememory_formatbytes",
       "relation": "calls",
       "_origin": "ast",
@@ -7306,6 +7366,18 @@
       "context": "call",
       "source_file": "frontend/src/components/MemoryDetail.tsx",
       "source_location": "L76",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_memorydetail_memorydetail",
+      "target": "frontend_src_lib_api_getmemory",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "frontend/src/components/MemoryDetail.tsx",
+      "source_location": "L107",
       "weight": 1.0
     },
     {
@@ -7366,6 +7438,18 @@
       "context": "call",
       "source_file": "frontend/src/components/MemoryTimeline.tsx",
       "source_location": "L91",
+      "weight": 1.0
+    },
+    {
+      "source": "frontend_src_components_networkstatus_networkstatus",
+      "target": "frontend_src_lib_api_gethealth",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "context": "call",
+      "source_file": "frontend/src/components/NetworkStatus.tsx",
+      "source_location": "L25",
       "weight": 1.0
     },
     {
@@ -15840,6 +15924,30 @@
       "weight": 1.0
     },
     {
+      "source": "backend_src_services_ipfs_fetchjson",
+      "target": "backend_src_services_ipfs_lrucache_set",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "context": "call",
+      "source_file": "backend/src/services/ipfs.ts",
+      "source_location": "L195",
+      "weight": 1.0
+    },
+    {
+      "source": "backend_src_services_ipfs_uploadjson",
+      "target": "backend_src_services_ipfs_lrucache_set",
+      "relation": "calls",
+      "_origin": "ast",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "context": "call",
+      "source_file": "backend/src/services/ipfs.ts",
+      "source_location": "L172",
+      "weight": 1.0
+    },
+    {
       "source": "backend_src_services_audit_log_queryauditlog",
       "target": "backend_src_services_audit_log_rowtoentry",
       "relation": "indirect_call",
@@ -15865,5 +15973,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "374682c09c5c49aeb35ed354981d7f32563d6262"
+  "built_at_commit": "ecd265574f3cc79893f5f32a4ce7b86b954012d8"
 }
