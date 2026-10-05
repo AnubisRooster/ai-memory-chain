@@ -1,13 +1,13 @@
-# Graph Report - ai-memory-chain  (2026-09-28)
+# Graph Report - ai-memory-chain  (2026-10-05)
 
 ## Corpus Check
-- 79 files · ~118,787 words
+- 79 files · ~119,306 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 3, .jsonl 1, .css 1)
 
 ## Summary
-- 574 nodes · 879 edges · 37 communities (28 shown, 9 thin omitted)
-- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.82)
+- 574 nodes · 879 edges · 37 communities (27 shown, 10 thin omitted)
+- Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -26,7 +26,6 @@
 - compilerOptions
 - compilerOptions
 - health-monitor.ts
-- graphify_pipeline.py
 - audit-log.ts
 - security.ts
 - watchdog.sh
@@ -43,7 +42,6 @@
 - install-service.sh
 - shutdown.sh
 - validator-exit.sh
-- next-env.d.ts
 - edge-entrypoint-node2.sh
 - edge-entrypoint-nonnat.sh
 
@@ -74,7 +72,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (37 total, 9 thin omitted)
+## Communities (37 total, 10 thin omitted)
 
 ### Community 0 - "api.ts"
 Cohesion: 0.06
@@ -82,19 +80,19 @@ Nodes (62): Home(), BlockchainExplorer(), BlockchainExplorerProps, formatTime(),
 
 ### Community 1 - "memory.ts"
 Cohesion: 0.07
-Nodes (41): upload, deepSearchObject(), router, ABI, getContract(), getContractAddress(), getMemoryCount(), getMemoryOnChain() (+33 more)
+Nodes (40): upload, deepSearchObject(), router, ABI, getContract(), getContractAddress(), getMemoryCount(), getMemoryOnChain() (+32 more)
 
 ### Community 2 - "package.json"
 Cohesion: 0.05
-Nodes (41): config, dependencies, ethers, description, devDependencies, concurrently, eslint, hardhat (+33 more)
+Nodes (40): config, dependencies, ethers, description, devDependencies, concurrently, eslint, hardhat (+32 more)
 
 ### Community 3 - "routes/validator.ts"
 Cohesion: 0.08
-Nodes (29): getKnownPeerApis(), PEERS_PATH, readPeersConfig(), router, getProvider(), CandidateInfo, getCandidates(), getConnectedPeers() (+21 more)
+Nodes (24): getKnownPeerApis(), PEERS_PATH, readPeersConfig(), router, getProvider(), CandidateInfo, getCandidates(), getConnectedPeers() (+16 more)
 
 ### Community 4 - "frontend/package.json"
 Cohesion: 0.06
-Nodes (31): dependencies, next, react, react-dom, devDependencies, autoprefixer, postcss, tailwindcss (+23 more)
+Nodes (30): dependencies, next, react, react-dom, devDependencies, autoprefixer, postcss, tailwindcss (+22 more)
 
 ### Community 5 - "scripts"
 Cohesion: 0.09
@@ -114,7 +112,7 @@ Nodes (18): cleanup(), log(), now_epoch(), rotate_log(), run_tasks(), self-heal.
 
 ### Community 9 - "MemoryAgent"
 Cohesion: 0.18
-Nodes (6): AgentSDKOptions, MemoryAgent, RecordMemoryInput, RecordMemoryResult, ref_http, ref_https
+Nodes (4): AgentSDKOptions, MemoryAgent, RecordMemoryInput, RecordMemoryResult
 
 ### Community 10 - "backend/package.json"
 Cohesion: 0.12
@@ -136,10 +134,6 @@ Nodes (15): compilerOptions, declaration, esModuleInterop, forceConsistentCasing
 Cohesion: 0.19
 Nodes (13): getLanAddresses(), app, PORT, server, shutdown(), closeDB(), HealthState, runCheck() (+5 more)
 
-### Community 15 - "graphify_pipeline.py"
-Cohesion: 0.13
-Nodes (13): graphify_analyze, graphify_build, graphify_cluster, graphify_detect, graphify_export, graphify_extract, graphify_llm, graphify_report (+5 more)
-
 ### Community 16 - "audit-log.ts"
 Cohesion: 0.29
 Nodes (11): router, AuditEntry, AuditQuery, AuditStats, getAuditStats(), getDB(), logScan(), queryAuditLog() (+3 more)
@@ -158,7 +152,7 @@ Nodes (12): devDependencies, supertest, ts-node-dev, @types/better-sqlite3, @typ
 
 ### Community 20 - "e2e.test.ts"
 Cohesion: 0.24
-Nodes (8): createApp(), getHealthState(), app, ipfsStore, memoryStore, app, supertest, ref_vitest
+Nodes (7): createApp(), getHealthState(), app, ipfsStore, memoryStore, app, supertest
 
 ### Community 21 - "discovery.sh"
 Cohesion: 0.42
@@ -191,22 +185,22 @@ Nodes (3): get_lan_ip(), log(), validator-join.sh script
 ## Knowledge Gaps
 - **249 isolated node(s):** `name`, `version`, `private`, `main`, `types` (+244 more)
   These have ≤1 connection - possible missing edges. (Counts symbols only; 292 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `hardhat` connect `package.json` to `routes/validator.ts`?**
   _High betweenness centrality (0.088) - this node is a cross-community bridge._
-- **Why does `express` connect `app.ts` to `audit-log.ts`, `memory.ts`, `backend/package.json`, `routes/validator.ts`?**
-  _High betweenness centrality (0.039) - this node is a cross-community bridge._
-- **Why does `scripts` connect `scripts` to `package.json`?**
-  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **What connects `name`, `version`, `private` to the rest of the system?**
   _249 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `api.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.056140350877192984 - nodes in this community are weakly interconnected._
+- **Why does `express` connect `app.ts` to `audit-log.ts`, `memory.ts`, `backend/package.json`, `routes/validator.ts`?**
+  _High betweenness centrality (0.039) - this node is a cross-community bridge._
 - **Should `memory.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.07407407407407407 - nodes in this community are weakly interconnected._
+- **Why does `scripts` connect `scripts` to `package.json`?**
+  _High betweenness centrality (0.036) - this node is a cross-community bridge._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.046464646464646465 - nodes in this community are weakly interconnected._
