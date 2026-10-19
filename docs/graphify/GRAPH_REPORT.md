@@ -1,7 +1,7 @@
-# Graph Report - ai-memory-chain  (2026-10-12)
+# Graph Report - ai-memory-chain  (2026-10-19)
 
 ## Corpus Check
-- 79 files · ~119,326 words
+- 79 files · ~88,386 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 3, .jsonl 1, .css 1)
 
