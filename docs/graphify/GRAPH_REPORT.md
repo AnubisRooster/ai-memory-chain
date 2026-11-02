@@ -1,7 +1,7 @@
-# Graph Report - ai-memory-chain  (2026-10-26)
+# Graph Report - ai-memory-chain  (2026-11-02)
 
 ## Corpus Check
-- 79 files · ~89,067 words
+- 79 files · ~91,565 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 3, .jsonl 1, .css 1)
 
@@ -173,7 +173,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `hardhat` connect `package.json` to `genesis.ts`?**
   _High betweenness centrality (0.078) - this node is a cross-community bridge._
 - **What connects `PATH`, `CONTRACT_ADDRESS`, `DEPLOYER_PRIVATE_KEY` to the rest of the system?**
-  _3 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _3 weakly-connected nodes found - possible missing edges._
 - **Should `api.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.056140350877192984 - nodes in this community are weakly interconnected._
 - **Why does `scripts` connect `scripts` to `package.json`?**
